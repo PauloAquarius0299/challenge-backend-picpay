@@ -39,5 +39,6 @@ public class User {
         this.userType = data.userType();
         this.email = data.email();
         this.password = data.password();
+        this.document = data.document();
     }
 }

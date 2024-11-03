@@ -25,7 +25,10 @@ public class TransactionService {
     @Autowired
     private RestTemplate restTemplate;
 
-    public void createTransaction(TransactionDTO transaction) throws Exception {
+    @Autowired
+    private NotificationService notificationService;
+
+    public Transaction createTransaction(TransactionDTO transaction) throws Exception {
         User sender = this.userService.findUserById(transaction.senderId());
         User receiver = this.userService.findUserById(transaction.receiverId());
 
@@ -48,13 +51,40 @@ public class TransactionService {
         this.repository.save(newTransaction);
         this.userService.saveUser(sender);
         this.userService.saveUser(receiver);
-    }
-    public boolean authorizeTransaction(User sender, BigDecimal value){
-       ResponseEntity<Map> authorizationResponse = restTemplate.getForEntity("https://util.devi.tools/api/v2/authorize", Map.class);
 
-       if(authorizationResponse.getStatusCode() == HttpStatus.OK){
-           String message = (String) authorizationResponse.getBody().get("Message");
-           return "Autorizado". equalsIgnoreCase(message);
-       } else return false;
+        this.notificationService.sendNotification(sender, "Transação realizada com sucesso!");
+        this.notificationService.sendNotification(receiver, "Transação recebida com sucesso!");
+
+        return newTransaction;
     }
+//    public boolean authorizeTransaction(User sender, BigDecimal value){
+//       ResponseEntity<Map> authorizationResponse = restTemplate.getForEntity("https://util.devi.tools/api/v2/authorize", Map.class);
+//
+//       if(authorizationResponse.getStatusCode() == HttpStatus.OK){
+//           String message = (String) authorizationResponse.getBody().get("Message");
+//           return "Autorizado". equalsIgnoreCase(message);
+//       } else return false;
+//    }
+
+    //Para garantir que a transição seja autorizada, ajustei a logica de verificação
+    //na função 'autorizeTransaction', pois o retorno da API externa indica explicitamente
+    //que a autorização falhou, então adaptei a lógica para analisar o conteudo da resposta.
+
+    public boolean authorizeTransaction(User sender, BigDecimal value) {
+        ResponseEntity<Map> authorizationResponse = restTemplate.getForEntity("https://util.devi.tools/api/v2/authorize", Map.class);
+
+        if (authorizationResponse.getStatusCode() == HttpStatus.OK) {
+            Map<String, Object> responseBody = authorizationResponse.getBody();
+            if (responseBody != null) {
+                Map<String, Object> data = (Map<String, Object>) responseBody.get("data");
+                Boolean isAuthorized = (Boolean) data.get("authorization");
+                return isAuthorized != null && isAuthorized;
+            }
+        }
+        return false;
+
+        //Verifiquei o corpo de resposta caso for nulo evita 'NullPointerExpection'.
+        //A função retorna 'true' se 'autorization' for 'true'; caso contrário false.
+    }
+
 }
